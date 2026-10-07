@@ -1,30 +1,70 @@
-// Copyright (C) CVAT.ai Corporation
-//
-// SPDX-License-Identifier: MIT
-
-@import 'base';
-
-.cvat-analytics-page {
-    overflow: auto;
+.annotation-counts-wrapper {
+    margin-bottom: 24px;
+    padding: 16px 24px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    background: #ffffff;
 }
 
-.cvat-analytics-page, .cvat-analytics-wrapper {
+.annotation-counts-title {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.annotation-counts-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.annotation-counts-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.annotation-counts-label {
+    width: 150px;
+    overflow: hidden;
+    text-align: right;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.annotation-counts-bar-container {
+    flex: 1;
+    height: 20px;
+    overflow: hidden;
+    background: #f0f0f0;
+    border-radius: 3px;
+}
+
+.annotation-counts-bar {
     height: 100%;
+    background: #1890ff;
+    border-radius: 3px;
+    transition: width 0.3s ease;
 }
 
-.cvat-analytics-inner {
-    @include cvat-management-page-inner;
+.annotation-counts-value {
+    width: 50px;
+    font-weight: 500;
 }
 
-.cvat-analytics-inner-wrapper {
-    @include cvat-management-page-inner-wrapper;
+.annotation-counts-message {
+    padding: 16px;
+    text-align: center;
+    border: 1px dashed #d9d9d9;
+    border-radius: 4px;
 }
 
-.cvat-analytics-header {
-    @include cvat-management-page-header;
+.annotation-counts-message.error {
+    color: #cf1322;
 }
 
-.cvat-analytics-export-button {
-    margin-left: $grid-unit-size * 2;
-    padding: 0;
+.annotation-counts-message button {
+    margin-top: 8px;
+    padding: 4px 15px;
+    cursor: pointer;
 }
