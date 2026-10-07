@@ -23,6 +23,122 @@ import { TimePeriod } from '.';
 
 const core = getCore();
 
+interface AnnotationCountsProps {
+    taskId: number;
+}
+
+function AnnotationCounts({ taskId }: AnnotationCountsProps): JSX.Element {
+    const [counts, setCounts] = useState<Record<string, number>>({});
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchCounts = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(
+                `/api/test/tasks/${taskId}/annotation-counts`,
+                {
+                    credentials: 'include',
+                    headers: {
+                        Accept: 'application/json',
+                    },
+                },
+            );
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to load annotation counts (${response.status})`,
+                );
+            }
+
+            const data = await response.json();
+            setCounts(data.counts || {});
+        } catch (err: unknown) {
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : 'Failed to load annotation counts',
+            );
+        } finally {
+            setLoading(false);
+        }
+    }, [taskId]);
+
+    useEffect(() => {
+        fetchCounts();
+    }, [fetchCounts]);
+
+    const entries = Object.entries(counts).sort(
+        (a, b) => b[1] - a[1],
+    );
+
+    const maxCount = entries.length
+        ? Math.max(...entries.map(([, count]) => count))
+        : 0;
+
+    return (
+        <div className='annotation-counts-wrapper'>
+            <h3 className='annotation-counts-title'>
+                Annotation Counts
+            </h3>
+
+            {loading && (
+                <div className='annotation-counts-message'>
+                    Loading annotation counts...
+                </div>
+            )}
+
+            {!loading && error && (
+                <div className='annotation-counts-message error'>
+                    <p>{error}</p>
+                    <button type='button' onClick={fetchCounts}>
+                        Retry
+                    </button>
+                </div>
+            )}
+
+            {!loading && !error && entries.length === 0 && (
+                <div className='annotation-counts-message'>
+                    No annotations found
+                </div>
+            )}
+
+            {!loading && !error && entries.length > 0 && (
+                <div className='annotation-counts-chart'>
+                    {entries.map(([label, count]) => (
+                        <div
+                            key={label}
+                            className='annotation-counts-row'
+                        >
+                            <div
+                                className='annotation-counts-label'
+                                title={label}
+                            >
+                                {label}
+                            </div>
+
+                            <div className='annotation-counts-bar-container'>
+                                <div
+                                    className='annotation-counts-bar'
+                                    style={{
+                                        width: `${(count / maxCount) * 100}%`,
+                                    }}
+                                />
+                            </div>
+
+                            <div className='annotation-counts-value'>
+                                {count}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 function AnalyticsReportPage(): JSX.Element {
     const requestedInstanceType: InstanceType = useInstanceType();
     const requestedInstanceId = useInstanceId(requestedInstanceType);
@@ -30,6 +146,7 @@ function AnalyticsReportPage(): JSX.Element {
     const [exporting, setExporting] = useState(false);
     const [resource, setResource] = useState<Project | Task | Job | null>(null);
     const [fetching, setFetching] = useState(true);
+
     const { user, org } = useSelector((state: CombinedState) => ({
         user: state.auth.user,
         org: state.organizations.current,
@@ -62,18 +179,19 @@ function AnalyticsReportPage(): JSX.Element {
 
             if (org) {
                 const memberships = await org.members(
-                    { filter: `{"and":[{"==":[{"var":"user"},"${user.username}"]}]}` },
+                    {
+                        filter: `{"and":[{"==":[{"var":"user"},"${user.username}"]}]}`,
+                    },
                 );
+
                 const isMaintainer = !!memberships.length &&
-                    [MembershipRole.MAINTAINER, MembershipRole.OWNER].includes(memberships[0].role);
+                    [MembershipRole.MAINTAINER, MembershipRole.OWNER]
+                        .includes(memberships[0].role);
 
                 if (!(user.isSuperuser || isMaintainer)) {
-                    // in an organization only admin and maintainer may export all events
-                    // for others add user filter
                     params.userId = user.id;
                 }
             } else if (!user.isSuperuser) {
-                // in sandbox only admin may export all events, for others add user filter
                 params.userId = user.id;
             }
 
@@ -100,7 +218,8 @@ function AnalyticsReportPage(): JSX.Element {
     useEffect(() => {
         if (
             Number.isInteger(requestedInstanceId) &&
-            [InstanceType.PROJECT, InstanceType.TASK, InstanceType.JOB].includes(requestedInstanceType)
+            [InstanceType.PROJECT, InstanceType.TASK, InstanceType.JOB]
+                .includes(requestedInstanceType)
         ) {
             let resourcePromise = null as (
                 ReturnType<typeof core.projects.get> |
@@ -110,24 +229,34 @@ function AnalyticsReportPage(): JSX.Element {
             );
 
             if (requestedInstanceType === InstanceType.PROJECT) {
-                resourcePromise = core.projects.get({ id: requestedInstanceId });
+                resourcePromise = core.projects.get({
+                    id: requestedInstanceId,
+                });
             } else if (requestedInstanceType === InstanceType.TASK) {
-                resourcePromise = core.tasks.get({ id: requestedInstanceId });
+                resourcePromise = core.tasks.get({
+                    id: requestedInstanceId,
+                });
             } else {
-                resourcePromise = core.jobs.get({ jobID: requestedInstanceId });
+                resourcePromise = core.jobs.get({
+                    jobID: requestedInstanceId,
+                });
             }
 
             setFetching(true);
-            resourcePromise.then((_resource) => {
-                setResource(_resource[0]);
-            }).catch((error: unknown) => {
-                notification.error({
-                    message: 'Could not receive the target resource from the server',
-                    description: error instanceof Error ? error.message : '',
+
+            resourcePromise
+                .then((_resource) => {
+                    setResource(_resource[0]);
+                })
+                .catch((error: unknown) => {
+                    notification.error({
+                        message: 'Could not receive the target resource from the server',
+                        description: error instanceof Error ? error.message : '',
+                    });
+                })
+                .finally(() => {
+                    setFetching(false);
                 });
-            }).finally(() => {
-                setFetching(false);
-            });
         }
     }, []);
 
@@ -135,37 +264,69 @@ function AnalyticsReportPage(): JSX.Element {
         <div className='cvat-analytics-page'>
             <div className='cvat-analytics-wrapper'>
                 <Row justify='center'>
-                    <Col span={22} xl={18} xxl={14} className='cvat-task-top-bar'>
+                    <Col
+                        span={22}
+                        xl={18}
+                        xxl={14}
+                        className='cvat-task-top-bar'
+                    >
                         <GoBackButton />
                     </Col>
                 </Row>
-                <Row justify='center' className='cvat-analytics-inner-wrapper'>
-                    <Col span={22} xl={18} xxl={14} className='cvat-analytics-inner'>
-                        { resource && (
+
+                <Row
+                    justify='center'
+                    className='cvat-analytics-inner-wrapper'
+                >
+                    <Col
+                        span={22}
+                        xl={18}
+                        xxl={14}
+                        className='cvat-analytics-inner'
+                    >
+                        {resource && (
                             <AnalyticsPageHeader
                                 exporting={exporting}
                                 fetching={fetching}
                                 resource={resource}
                                 onExportEvents={onExportEvents}
-                                onUpdateTimePeriod={(from: Date | null, to: Date | null) => {
+                                onUpdateTimePeriod={(
+                                    from: Date | null,
+                                    to: Date | null,
+                                ) => {
                                     function localToUTC(date: Date): string {
-                                        // convert local time to UTC string WITHOUT applying any timezone offset
-                                        // the user specified UTC time already in the date picker
-                                        // basically we only convert timezone information
                                         return (
-                                            new Date((Number(date) - date.getTimezoneOffset() * 60000)).toISOString()
+                                            new Date(
+                                                Number(date) -
+                                                date.getTimezoneOffset() * 60000,
+                                            ).toISOString()
                                         );
                                     }
 
-                                    setTimePeriod((from && to) ? {
-                                        startDate: localToUTC(from),
-                                        endDate: localToUTC(to),
-                                    } : null);
+                                    setTimePeriod(
+                                        from && to
+                                            ? {
+                                                startDate: localToUTC(from),
+                                                endDate: localToUTC(to),
+                                            }
+                                            : null,
+                                    );
                                 }}
                             />
                         )}
-                        { fetching && <CVATLoadingSpinner /> }
-                        { resource && <AnalyticsReportContent timePeriod={timePeriod} resource={resource} /> }
+
+                        {fetching && <CVATLoadingSpinner />}
+
+                        {resource instanceof Task && (
+                            <AnnotationCounts taskId={resource.id} />
+                        )}
+
+                        {resource && (
+                            <AnalyticsReportContent
+                                timePeriod={timePeriod}
+                                resource={resource}
+                            />
+                        )}
                     </Col>
                 </Row>
             </div>
